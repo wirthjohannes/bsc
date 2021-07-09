@@ -415,7 +415,7 @@ xClassicModuleVerilog m params clocks resets ports methodinfo schedinfo pathinfo
         -- Classic modules should have resets synchronized with their clock (if any)
         reset_info  =
             let mkInputResetInf i s = (i, (Just (VName s), default_clk))
-            in  ResetInfo (zipWith mkInputResetInf reset_names resets) []
+            in  ResetInfo (zipWith mkInputResetInf reset_names resets) [] []
         default_rst = listToMaybe reset_names -- Nothing if no resets
 
         arg_info    = clock_ais  ++ reset_ais  ++ param_ais  ++ port_ais

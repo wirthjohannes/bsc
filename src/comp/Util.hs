@@ -545,6 +545,9 @@ log2 = Log2.log2
 divC :: Integer -> Integer -> Integer
 divC x y = (x+y-1) `div` y
 
+divF :: Integer -> Integer -> Integer
+divF x y = x `div` y
+
 integerToBits :: Integer -> Integer -> [Integer]
 integerToBits 0 0 = []
 integerToBits 0 n = internalError "integerToBits"

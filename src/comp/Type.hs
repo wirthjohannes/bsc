@@ -113,11 +113,12 @@ kNN = Kfun KNum KNum
 kNNS = Kfun KNum kNS
 kNS  = Kfun KNum KStar
 
-tAdd, tSub, tMul, tDiv, tLog, tExp, tMax, tMin :: Type
+tAdd, tSub, tMul, tDiv, tDivF, tLog, tExp, tMax, tMin :: Type
 tAdd = TCon (TyCon idTAdd (Just kNNN) TIabstract)
 tSub = TCon (TyCon idTSub (Just kNNN) TIabstract)
 tMul = TCon (TyCon idTMul (Just kNNN) TIabstract)
 tDiv = TCon (TyCon idTDiv (Just kNNN) TIabstract)
+tDivF = TCon (TyCon idTDivF (Just kNNN) TIabstract)
 tLog = TCon (TyCon idTLog (Just kNN)  TIabstract)
 tExp = TCon (TyCon idTExp (Just kNN)  TIabstract)
 tMax = TCon (TyCon idTMax (Just kNNN) TIabstract)

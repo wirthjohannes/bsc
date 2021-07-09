@@ -196,6 +196,7 @@ that they will turn up in this order.
 >  | BVI_family (Id, Id)
 >  | BVI_input_reset ResetInf
 >  | BVI_output_reset ResetInf
+>  | BVI_output_reset_fixedid ResetInf
 >  | BVI_arg (VArgInfo, CExpr, Bool) -- Bool says "bind, rather than eq"
 >  | BVI_method (Id,VFieldInfo, Bool)
 >          -- Id is short name; prefixed name is used in second component

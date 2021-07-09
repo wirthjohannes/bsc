@@ -469,7 +469,8 @@ type ResetInf = (Id, (Maybe VName, Maybe Id))
 -- more information to be added (sync/async, clock relationships, etc.)
 data VResetInfo = ResetInfo {
                    input_resets  :: [ResetInf],
-                   output_resets :: [ResetInf]
+                   output_resets :: [ResetInf],
+                   output_resets_fixedid :: [ResetInf]
                   }
   deriving(Show, Ord, Eq, Generic.Data, Generic.Typeable)
 
@@ -483,7 +484,7 @@ lookupOutputResetPort = lookupOutputReset -- no interpretation needed
 
 lookupOutputReset :: Id -> VModInfo -> VName
 lookupOutputReset i vmi =
-    case (lookup i (output_resets (vRst vmi))) of
+    case (lookup i ((output_resets (vRst vmi))++(output_resets_fixedid (vRst vmi)))) of
         Nothing ->
             internalError ("lookupOutputReset unknown reset " ++
                            ppReadable i ++ ppReadable (vRst vmi))
@@ -511,7 +512,7 @@ getOutputResetPortTable ResetInfo { output_resets = out_rinfos } =
     M.fromList [(i, vn) | (i, (Just vn, _)) <- out_rinfos]
 
 instance PPrint VResetInfo where
-    pPrint d p (ResetInfo in_rs out_rs) = vcat (map pRInf (out_rs ++ in_rs))
+    pPrint d p (ResetInfo in_rs out_rs out_rs_f) = vcat (map pRInf (out_rs_f ++ out_rs ++ in_rs))
       where t = text
             pRInf (i,(mn,mc)) =
                 t"reset " <> pPrint d p i <>
@@ -529,7 +530,7 @@ getInputResetPorts (ResetInfo { input_resets = in_resets }) =
     catMaybes (map (fst . snd) in_resets)
 
 instance Hyper VResetInfo where
-  hyper (ResetInfo x1 x2) y = hyper2 x1 x2 y
+  hyper (ResetInfo x1 x2 x3) y = hyper3 x1 x2 x3 y
 
 -- ===============
 -- Inout

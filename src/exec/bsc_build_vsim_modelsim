@@ -162,12 +162,13 @@ VSIM_PATH_FLAGS=$BSC_VERILOG_DIRS
 ######################################################################
 # compile Verilog files
 if [ "$VERBOSE" = "yes" ]; then
-  echo "exec: vlog -sv -work $work_dir +libext+.v+.vqm $VSIM_PATH_FLAGS $BSC_VSIM_FLAGS +define+TOP=$BSC_TOPLEVEL_MODULE $BSC_VERILOG_DEFS $BSC_VERILOG_OPTS $BSC_VERILOG_FILES"
+  echo "exec: vlog -sv -work $work_dir +libext+.v+.vqm $VSIM_PATH_FLAGS $BSC_VSIM_FLAGS +define+TOP=$BSC_TOPLEVEL_MODULE $BSC_VERILOG_DEFS $BSC_VERILOG_OPTS $BSC_VERILOG_FILES $XILINX_VIVADO/data/verilog/src/glbl.v"
+
   VLOG_VERBOSE=""
 else
   VLOG_VERBOSE="-quiet"
 fi
-vlog $VLOG_VERBOSE -sv -work $work_dir +libext+.v $VSIM_PATH_FLAGS $BSC_VSIM_FLAGS +define+TOP=$BSC_TOPLEVEL_MODULE $BSC_VERILOG_DEFS $BSC_VERILOG_OPTS $BSC_VERILOG_FILES
+vlog $VLOG_VERBOSE -sv -64 -work $work_dir +libext+.v $VSIM_PATH_FLAGS $BSC_VSIM_FLAGS +define+TOP=$BSC_TOPLEVEL_MODULE $BSC_VERILOG_DEFS $BSC_VERILOG_OPTS $BSC_VERILOG_FILES $XILINX_VIVADO/data/verilog/src/glbl.v
 status=$?
 if [ "$status" != "0" ]; then
     echo "ERROR: cannot compile Verilog files" >&2
@@ -197,11 +198,11 @@ fi
 
 if [ "$VERBOSE" = "yes" ]; then
     VOPT_VERBOSE=""
-    echo "exec: vopt -work $work_dir main +acc -o main_opt"
+    echo "exec: vopt -64 -work $work_dir main glbl +acc -o main_opt"
 else
     VOPT_VERBOSE="-quiet"
 fi
-vopt $VOPT_VERBOSE -work $work_dir main +acc -o main_opt
+vopt -64 $VOPT_VERBOSE -work $work_dir main glbl +acc -o main_opt
 status=$?
 if [ "$status" != "0" ]; then
     echo "ERROR: cannot optimize the design" >&2
@@ -245,7 +246,7 @@ fi
 
 # generate a "simulator executable" shell script
 echo '#!/bin/sh' > $BSC_SIM_EXECUTABLE
-echo "vsim -quiet -lib $work_dir $VPI_LINK -do \"run -all; quit\" -c main_opt \$*" >> $BSC_SIM_EXECUTABLE
+echo "vsim -64 -quiet -lib $work_dir $VPI_LINK -dpicpppath /usr/bin/gcc -do \"run -all; quit\" -c main_opt \$*" >> $BSC_SIM_EXECUTABLE
 echo 'status=$?' >> $BSC_SIM_EXECUTABLE
 echo 'if [ "$status" != "0" ]; then' >> $BSC_SIM_EXECUTABLE
 echo '    echo "ERROR: cannot simulate design" >&2' >> $BSC_SIM_EXECUTABLE

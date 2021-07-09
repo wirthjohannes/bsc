@@ -2974,6 +2974,14 @@ statements: interface, method, output_clock, output_reset
 >             return [ISBVI pos (BVI_output_reset (ci prefixedId)),
 >                     ISBVI pos (BVI_method (id,V.Reset prefixedId,False))])
 >         <|>
+>         (do pTheString "output_reset_fixedid"
+>             id <- pIdentifier
+>             ci <- pResetInfAwaitingId
+>             pSemi
+>             let prefixedId = mkUSId prefix id
+>             return [ISBVI pos (BVI_output_reset_fixedid (ci prefixedId)),
+>                     ISBVI pos (BVI_method (id,V.Reset prefixedId,False))])
+>         <|>
 >         (do pTheString "ifc_inout"
 >             id <- pIdentifier
 >             vname <- pInParens (pVName)

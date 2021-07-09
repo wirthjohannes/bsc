@@ -3,7 +3,7 @@
 module Wires(ClockId, ClockDomain(..), ResetId,
              nextClockId, nextClockDomain, nextResetId,
              initClockId, initClockDomain, initResetId,
-             noClockId, noClockDomain, noResetId,
+             noClockId, noClockDomain, noResetId, fixedResetId,
              noDefaultClockId, noDefaultResetId,
              WireProps(..), emptyWireProps,
              writeClockDomain, readClockDomain,
@@ -81,6 +81,9 @@ noResetId = (ResetId (-1))
 
 noDefaultResetId :: ResetId
 noDefaultResetId = ResetId (-2)
+
+fixedResetId :: ResetId
+fixedResetId = ResetId (-3)
 
 data WireProps = WireProps { -- clock domain of object, Nothing if object crosses clock domains
                              wpClockDomain :: Maybe ClockDomain,

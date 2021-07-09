@@ -1,7 +1,7 @@
 package FIFOF (FIFOF(..), mkFIFOF, mkFIFOF1, mkSizedFIFOF, mkLFIFOF,
                mkLSizedFIFOF, mkUGFIFOF, mkUGFIFOF1, mkUGSizedFIFOF,
                mkUGLFIFOF, mkUGLSizedFIFOF, mkGFIFOF, mkGFIFOF1,
-               mkGSizedFIFOF, mkGLFIFOF, mkGLSizedFIFOF,
+               mkGSizedFIFOF, mkGLFIFOF, mkGLSizedFIFOF, fifof_ToFifof,
                mkDepthParamFIFOF, mkUGDepthParamFIFOF, mkGDepthParamFIFOF,
                mkDepthParamLFIFOF, mkUGDepthParamLFIFOF, mkGDepthParamLFIFOF
              ) where

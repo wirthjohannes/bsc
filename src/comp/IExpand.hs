@@ -28,6 +28,8 @@ import Data.Graph
 import qualified Data.Generics as Generic
 import System.IO(Handle, BufferMode(..), IOMode(..), stdout, stderr,
                  hSetBuffering, hIsOpen, hIsClosed)
+
+import System.IO.Unsafe
 import System.FilePath(isRelative)
 import qualified Data.Array as Array
 import qualified Data.IntMap as IM
@@ -78,7 +80,6 @@ import ITransform(iTransExpr)
 import IOUtil(progArgs)
 import ISyntaxXRef(mapIExprPosition, mapIExprPositionConservative)
 import IStateLoc
-
 -----------------------------------------------------------------------------
 -- Trace Flags
 
@@ -1562,7 +1563,8 @@ newState b ui t tss vi ns es = do
                    ancestorClocks = ancestors,
                    siblingClocks = siblings } = vClk vi
        ResetInfo { input_resets = in_reset_info,
-                   output_resets = out_reset_info } = vRst vi
+                   output_resets = out_reset_info,
+                   output_resets_fixedid = out_reset_info_fixedid } = vRst vi
 
        -- group clocks by domain, using bidirectional edges
        domain_edges = ancestors ++ map swap ancestors ++
@@ -1775,40 +1777,63 @@ newState b ui t tss vi ns es = do
                         when (not (null es)) $ errsG es
          _ <- deriveTopResetClocks
 
-         let findOutputResetClock i =
+         let findOutputResetClock i reset_info =
                  -- XXX unQualId VModInfo
-                 case (lookup (unQualId i) out_reset_info) of
+                 case (lookup (unQualId i) reset_info) of
                      Just (_, Nothing) -> noClock
                      Just (_, Just c ) -> lookupResetClock i c
                      Nothing -> internalError
-                                    ("IExpand.newState: " ++
-                                     "reset not in out_reset_info: " ++
-                                     ppReadable i)
+                                        ("IExpand.newState: " ++
+                                         "reset not in out_reset_info: " ++
+                                         ppReadable i)
+
+         let isOutputResetFixed i =
+                 -- XXX unQualId VModInfo
+                 case (lookup (unQualId i) out_reset_info_fixedid) of
+                     Just (_, Nothing) -> True
+                     Just (_, Just c ) -> True
+                     Nothing -> False
+
+         let getResetsInfo f =
+                 case f of
+                     True -> out_reset_info_fixedid
+                     False -> out_reset_info
+
 
          let resetwire_map =
                  let mkICSel n = ICSel { iConType = itReset,
                                          selNo = n,
                                          numSel = genericLength (vFields vi) }
-                 in  [ (id, clock, wire) |
+                 in  [ (id, clock, wire, fixed) |
                           -- index tuples from 0
                           (Reset id, n) <- zip (vFields vi) [0..],
-                          let clock = findOutputResetClock id,
+                          let fixed = isOutputResetFixed id,
+                          let clock = findOutputResetClock id (getResetsInfo fixed),
                           let wire = {- trace ("id: " ++ show id) $ -}
                                      IAps (ICon id (mkICSel n)) [] [e]
                      ]
 
-         let makeOutReset (id, clock, wire) = do
+         let makeOutResetNotFixedID id clock wire = do
                  r <- newReset clock wire
                  return (id, r)
+
+         let makeOutResetFixedID id clock wire = do
+                 r <- newResetFixedID clock wire
+                 return (id, r)
+
+         let makeOutReset (id, clock, wire, fixed) =
+                 case fixed of
+                     True -> makeOutResetFixedID id clock wire
+                     False -> makeOutResetNotFixedID id clock wire
 
          reset_out_map <- mapM makeOutReset resetwire_map
 
          let reset_map = map fst2of3 resetarginfo_map ++ reset_out_map
 
          return reset_map
-
-
 -----------------------------------------------------------------------------
+
+
 
 -- returns the evaluated expression and maybe port info (for ports)
 --

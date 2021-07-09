@@ -157,7 +157,7 @@ GHC += -optl -headerpad_max_install_names
 endif
 
 # flags for the haskell compiler RTS
-GHCRTSFLAGS ?= +RTS -M4G -A128m -RTS
+GHCRTSFLAGS ?= +RTS -M4G -A128m -K100m -RTS
 
 # flags for the haskell compile
 GHCINCLUDES =  \
@@ -170,7 +170,7 @@ GHCTMP = '-tmpdir $(TMPDIR)'
 # Default RTS flags for programs built with a Haskell main
 # 256MB heap, 10MB stack, 1 second interval between heap profiles
 # If you modify this, also update rts_opts in ../vendor/htcl/haskell.c
-RTSFLAGS = "-with-rtsopts=-H256m -K10m -i1"
+RTSFLAGS = "-with-rtsopts=-H256m -K100m -i1"
 FVIA ?= -fasm
 GHCFLAGS = \
 	-hide-all-packages \

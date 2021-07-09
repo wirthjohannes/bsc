@@ -154,6 +154,7 @@ class WideData
 
   friend bool operator==(const WideData&, const WideData&);
   friend bool operator!=(const WideData&, const WideData&);
+  friend bool operator!=(const WideData&, const unsigned int);
   friend bool operator<(const WideData&, const WideData&);
   friend bool operator>(const WideData&, const WideData&);
   friend bool operator<=(const WideData&, const WideData&);

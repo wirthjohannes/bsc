@@ -1,13 +1,13 @@
 package Prelude(
         {-Add(..), Max(..), Log(..),-}
         Monad(..), MonadFix(..),
-        Bits(..), Eq(..),
+        Bits(..), CBOR(..), Eq(..),
         Literal(..), RealLiteral(..), SizedLiteral(..), StringLiteral(..),
         Ord(..), Bounded(..), Bitwise(..), BitReduction(..), FShow(..), DefaultValue(..),
         PrimParam(..), PrimPort(..),
         Bit, Rules, Module, Integer, Real, String, Char, SizeOf, Id__,
         PrimAction, ActionValue, Action, ActionValue_, ActionWorld, AVStruct,
-        TAdd, TSub, TMul, TDiv, TLog, TExp, TMax, TMin,
+        TAdd, TSub, TMul, TDiv, TDiv,F TLog, TExp, TMax, TMin,
         Nat(..),
         IsModule(..), addModuleRules, addRules,
 
@@ -349,6 +349,10 @@ fmap f xs = do
 class coherent Bits a n | a -> n where
     pack   :: a -> Bit n
     unpack :: Bit n -> a
+
+class coherent CBOR a n | a -> n where
+    toCBOR   :: a -> Bit n
+    fromCBOR :: Bit n -> a
 
 --@ The class of types on which equality is defined.
 --@ \index{Eq@\te{Eq} (type class)}
@@ -975,6 +979,12 @@ instance Bits (Bit k) k
   where
     pack x = x
     unpack x = x
+--@ (Add k r c, Mul m 8 c, Max r 7 7, Add r y 7)
+
+instance (Add k r c, Mul m 8 c, Div k 8 m) => CBOR (Bit k) c
+  where
+    toCBOR x = extend x
+    fromCBOR x = truncate x
 
 --@ \begin{libverbatim}
 --@ instance Eq #(Bit#(n));
@@ -2764,6 +2774,7 @@ primitive type TAdd :: # -> # -> #
 primitive type TSub :: # -> # -> #
 primitive type TMul :: # -> # -> #
 primitive type TDiv :: # -> # -> #
+primitive type TDivF :: # -> # -> #
 primitive type TLog :: # -> #
 primitive type TExp :: # -> #
 primitive type TMax :: # -> # -> #

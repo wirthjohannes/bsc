@@ -614,7 +614,7 @@ instance PVPrint CExpr where
         sep [
           t"(unexpected) module verilog" <+> pp d m <> t";",
           (if c==(ClockInfo [][][][]) then empty else pPrint d p c),
-          (if r==(ResetInfo [][]) then empty else pPrint d p r),
+          (if r==(ResetInfo [][][]) then empty else pPrint d p r),
           nest 4 (if null ses then empty else pparen True (sepList (map ppA ses) (t","))),
           nest 4 (t"{" $+$ pBlock d 2 False (map (ppVeriMethod d Nothing) fs) (t";") (t"}")),
           nest 4 (pp d sch),

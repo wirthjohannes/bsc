@@ -27,7 +27,7 @@ module IExpandUtils(
         chkModuleArgument, chkModuleArgumentClkRst,
         getMethodsByClockDomain, getMethodsByReset,
         extractWireSet,
-        addHeapCell, addHeapUnev, newClock, newReset,
+        addHeapCell, addHeapUnev, newClock, newReset, newResetFixedID,
         addHeapPred,
         addInputClock, addOutputClock, addInputReset, addOutputReset,
         getClkGateUses, clearClkGateUses, setClkGateUses,
@@ -106,6 +106,8 @@ import ISyntaxXRef(mapIExprPosition, mapIExprPosition2)
 import IStateLoc(IStateLoc, IStateLocPathComponent(..), StateLocMap,
                  newIStateLocTop, hasIgnore, isAddRules, isLoop, extendStateLocMap,
                  stateLocToPrefix, createSuffixedId,  hasHide, hasHideAll, stateLocToHierName)
+
+import Wires(fixedResetId)
 
 {- DEBUGGING AIDS
 import Util(getEnvDef,traces)
@@ -1907,7 +1909,7 @@ make_vresetinfo errh in_rinfos out_rinfos rstClkDomMap domainToIdsMap = do
     -- no change to output infos
     let out_rinfos' = out_rinfos
 
-    return $ ResetInfo (map snd in_rinfos') (map snd out_rinfos')
+    return $ ResetInfo (map snd in_rinfos') (map snd out_rinfos') []
 
 
 -- This is used by IExpand.newState to both
@@ -2253,6 +2255,18 @@ newReset clock wire = do
   let resetid  = newResetId s
   let resetid' = nextResetId resetid
   put (s { newResetId = resetid'})
+  when doTraceClock $ traceM ("new reset id: " ++ (show resetid))
+  let reset = makeReset resetid clock wire
+  addReset reset
+  return reset
+
+-- make a reset given an expression for the signal
+-- and its associated clock (possibly noClock)
+-- be careful about what to display because this is called from newState
+newResetFixedID :: HClock -> HExpr -> G HReset
+newResetFixedID clock wire = do
+  s <- get
+  let resetid  = fixedResetId
   when doTraceClock $ traceM ("new reset id: " ++ (show resetid))
   let reset = makeReset resetid clock wire
   addReset reset
@@ -2784,6 +2798,7 @@ makeUniqueRuleString seen str =
 -- #############################################################################
 -- #
 -- #############################################################################
+
 
 -- check the clock set discovered during elaboration
 chkClockDomain :: String -> Id -> HWireSet -> HExpr -> G ()

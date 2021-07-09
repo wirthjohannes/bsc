@@ -19,14 +19,14 @@ import PreIds(
               idMetaData, idStarArg, idNumArg, idStrArg, idConArg,
               idMetaConsNamed, idMetaConsAnon, idMetaField,
               -- classes that the compiler can derive
-              idEq, idBits, idFShow, idBounded, idDefaultValue,
+              idEq, idBits, idCBOR, idFShow, idBounded, idDefaultValue,
               -- classes that are auto-derived
               autoderivedClasses,
               idGeneric,
               -- internal classes defined in terms of Generic but still occasionally auto-derived
               idClsUninitialized, idUndefined,
               -- class members
-              idPack, idUnpack,
+              idPack, idUnpack, idToCBOR, idFromCBOR,
               idEqual, idNotEqual,
               idfshow,
               idMaxBound, idMinBound,
@@ -38,7 +38,7 @@ import PreIds(
               -- functions
               idPrimUnitAt,
               idFalse, idTrue, idNot, idAnd,
-              idPrimOrd, idPrimChr,
+              idPrimOrd, idPrimChr, idPrimUnit,
               idPrimSplit, idPrimConcat, idPrimTrunc,
               idFormat,
               )
@@ -154,6 +154,8 @@ doDataDer _ _ _ i vs ocs cs (CTypeclass di) | qualEq di idEq =
   Right [doDEq (getPosition di) i vs ocs cs]
 doDataDer _ _ _ i vs ocs cs (CTypeclass di) | qualEq di idBits =
   doDBits (getPosition di) i vs ocs cs
+doDataDer _ _ _ i vs ocs cs (CTypeclass di) | qualEq di idCBOR =
+  doDCBOR (getPosition di) i vs ocs cs
 doDataDer _ _ _ i vs ocs cs (CTypeclass di) | qualEq di idBounded =
   Right [doDBounded (getPosition di) i vs ocs cs]
 doDataDer _ _ _ i vs ocs cs (CTypeclass di) | qualEq di idDefaultValue =
@@ -198,6 +200,8 @@ doStructDer _ _ _ i vs cs (CTypeclass di) | qualEq di idEq =
   Right [doSEq (getPosition di) i vs cs]
 doStructDer _ _ _ i vs cs (CTypeclass di) | qualEq di idBits =
   Right [doSBits (getPosition di) i vs cs]
+doStructDer _ _ _ i vs cs (CTypeclass di) | qualEq di idCBOR =
+  Right [doSCBOR (getPosition di) i vs cs]
 doStructDer _ _ _ i vs cs (CTypeclass di) | qualEq di idBounded =
   Right [doSBounded (getPosition di) i vs cs]
 doStructDer _ _ _ i vs cs (CTypeclass di) | qualEq di idDefaultValue =
@@ -530,6 +534,252 @@ doDBits dpos type_name type_vars original_tags tags =
 
 hasSz :: CExpr -> Type -> CExpr
 hasSz e s = CHasType e (CQType [] (TAp tBit s))
+
+
+-- -------------------------
+
+-- | Derive CBOR for a struct (product type), and return the instance defn.
+-- Recursively pack/unpack each field, and concatenate/split the results.
+doSCBOR :: Position -> Id -> [Type] -> CFields -> CDefn
+doSCBOR dpos ti vs fields = Cinstance (CQType ctx (cTApplys (cTCon idCBOR) [aty, sz])) [pk, un]
+  where tiPos = getPosition ti
+        ctx = bCtx ++ aCtx ++ cCtx
+        cCtx = concatMap (\ (CField { cf_type = CQType q _}) -> q) fields
+        bCtx = zipWith (\ (CField { cf_type = cqt@(CQType _ t) }) sv ->
+                        CPred (CTypeclass idCBOR)
+                                  [t, cTVarKind
+                                      (setIdPosition (getPosition cqt) sv)
+                                      KNum]) fields bvs
+        aCtx = let f _ [] _ = []
+                   f a (s:ss) (n:nn) =
+                       CPred (CTypeclass idAdd)
+                                 [cTVarKind s KNum, cTVarKind a KNum,
+                                  cTVarKind n KNum] : f n ss nn
+                   f _ _ _ = internalError "Deriving.doSCBOR.f: _ (_:_) []"
+                   b:bs = reverse bvs
+                in if null fields then [] else f b bs avs
+        avs = take (n-1) (everyThird tmpTyVarIds)
+        bvs = take n (everyThird (tail tmpTyVarIds))
+        sz = case fields of
+                [] -> cTNum 0 tiPos
+                [_] -> cTVarKind (setIdPosition tiPos (headOrErr "doSCBOR" bvs)) KNum
+                _   -> cTVarKind (setIdPosition tiPos (lastOrErr "doSCBOR" avs)) KNum
+        aty = cTApplys (cTCon ti) vs
+        bty = TAp (cTCon idBit) sz
+        n = length fields
+
+        pk = CLValueSign (CDef (idToCBORNQ dpos) (CQType [] (aty `fn` bty)) [pkc]) []
+        pkc = CClause [CPVar id_x] [] pkb
+        vx = CVar id_x
+        pkb = case fields of
+                [] -> anyExprAt tiPos
+                _  -> foldr1 eConcat
+                      [cVApply idToCBOR [CSelectTT ti vx (cf_name field)]
+                       | field <- fields]
+
+        un = CLValueSign (CDef (idFromCBORNQ dpos) (CQType [] (bty `fn` aty)) [unc]) []
+        unc = CClause [CPVar id_x] [] ukb
+        ukb = case fields of
+                [] -> CStruct ti []
+                [field] -> CStruct ti [(cf_name field, cVApply idFromCBOR [vx])]
+                _  -> let xs = take (n-1) tmpVarXIds
+                          bind = mkBind vx xs
+                          mkBind o [] = id
+                          mkBind o (x:xs) =
+                                monoDef x (cVApply idPrimSplit [o]) .
+                                mkBind (CSelectTT idPrimPair (CVar x) idPrimSnd) xs
+                          mkExp [field] y _ =
+                              [(cf_name field, cVApply idFromCBOR
+                                [CSelectTT idPrimPair (CVar y) idPrimSnd])]
+                          mkExp (field:fields) y (x:xs) =
+                              (cf_name field, cVApply idFromCBOR
+                               [CSelectTT idPrimPair (CVar x) idPrimFst]) :
+                              mkExp fields x xs
+                          mkExp _ _ _ = internalError "Deriving.doSCBOR.ukb.mkExp: [] _ _ or _ _ []"
+                          err = internalError "Deriving.doSCBOR.ukb.mkExp: no var"
+                      in  bind (CStruct ti (mkExp fields err xs))
+
+
+-- | Derive Bits instance for a data (sum) type, with the pack and unpack
+-- functions. The packing for a data type consists of a tag and a body. The tag
+-- size is log2(n) bits when there are n constructors, and the constructors are
+-- numbered from 0 in order of appearance). The body is the packing of each of
+-- a constructor's fields concatenated from left to right. When the constructor
+-- bodies are not all the same length, they are left padded to the length of
+-- the longest body.
+-- An enum is like a degenerate form of data type where none of the constructors
+-- have a body, and with the added flexibility that the user can specify the
+-- tag for a given value.
+-- Data tags aren't dense (i.e. don't cover all possible bit encodings) unless
+-- there are 2^n constructors, and additionally enum tags may be sparse if
+-- the user specifies gaps in the tags.
+doDCBOR :: Position -> Id -> [Type] -> COSummands -> CSummands ->
+           Either EMsg [CDefn]
+doDCBOR dpos type_name type_vars original_tags tags
+    | not (null (duplicate_tag_encoding_errors type_name tags)) =
+        Left (head (duplicate_tag_encoding_errors type_name tags))
+doDCBOR dpos enum_name type_vars original_tags tags
+    | isEnum original_tags =
+    -- simple case where the fields are just tags, so the number of bits
+    -- required to represent the data type is known statically, so
+    -- no provisos are required and encoding does not recurse
+    let -- unpacked_ctype: original enum type
+        unpacked_ctype = cTApplys (cTCon enum_name) type_vars
+        -- highest tag encoding
+        max_tag | null tags = 0
+                | otherwise = foldr1 max [cis_tag_encoding tag | tag <- tags]
+        is_contiguous = contiguousTags tags
+        -- # of bits required to represent the tag (i.e., the enum type)
+        num_bits_ctype = cTNum (log2 (max_tag + 1)) (getPosition enum_name)
+        -- packed_ctype: Bit n (n bits required to represent the enum)
+        packed_ctype = TAp (cTCon idBit) num_bits_ctype
+        pack_function =
+            CDef (idToCBORNQ dpos) (CQType [] (unpacked_ctype `fn` packed_ctype))
+            pack_body
+        -- pack optimized for [0, 1, ..] (better hardware)
+        pack_body | is_contiguous = [CClause [] [] (cVar idPrimOrd)]
+                  | otherwise = [mk_pack_clause tag | tag <- tags]
+        mk_pack_clause tag = -- clause for a specific tag
+            let unpacked_pattern =
+                    [CPCon1 enum_name (getCISName tag)
+                     (CPstruct (idPrimUnitAt (getPosition tag)) [])]
+                packed_expr =
+                    hasSz (CLit (num_to_cliteral_at (getPosition tag)
+                                 (cis_tag_encoding tag))) num_bits_ctype
+            in  CClause unpacked_pattern [] packed_expr
+        unpack_function =
+            CDef (idFromCBORNQ dpos) (CQType [] (packed_ctype `fn` unpacked_ctype))
+                 unpack_body
+        -- unpack optimized for [0, 1, ..] (better hardware)
+        unpack_body | is_contiguous = [CClause [] [] (cVar idPrimChr)]
+                    | otherwise = [mk_unpack_clause tag | tag <- tags]
+        mk_unpack_clause tag = -- clause for a specific tag
+            let packed_pattern = [CPLit (num_to_cliteral_at (getPosition tag)
+                                         (cis_tag_encoding tag))]
+                unpacked_expr =
+                    CCon1 enum_name (getCISName tag) (CStruct idPrimUnit [])
+            in  CClause packed_pattern [] unpacked_expr
+    in  -- instance Bits unpacked_ctype num_bits_ctype where ...
+        Right $
+        [Cinstance
+         (CQType [] (cTApplys (cTCon idCBOR) [unpacked_ctype, num_bits_ctype]))
+         [CLValueSign pack_function [], CLValueSign unpack_function []]]
+doDCBOR dpos type_name type_vars original_tags tags =
+    -- default case where fields contain data in addition to tags: provisos
+    -- are required to compute the final bit size
+    let -- decl_position: where the original type was declared
+        decl_position = getPosition type_name
+        -- fix_position: point an id at the type for which we're deriving
+        fix_position = setIdPosition decl_position
+        -- make_num_vars: turn a list of ids into usable numeric types
+        -- fix their position and mark them as KNum
+        make_num_vars n l = map (cTVarNum . fix_position) $ take n l
+        -- type_ctype: the csyntax type for which we're deriving
+        unpacked_ctype = cTApplys (cTCon type_name) type_vars
+        -- num_tags: number of tags in the tagged union
+        num_tags = length tags
+        -- max tag: the highest tag encoding
+        max_tag | null tags = 0
+                | otherwise = foldr1 max [cis_tag_encoding tag | tag <- tags]
+        -- num_tag_bits_ctype: the number of bits required to represent the tag
+        num_tag_bits_ctype = cTNum (log2 (max_tag + 1)) decl_position
+        -- provisos constraining the final bit size
+        provisos = fields_provisos_bits ++ max_field_size_add_provisos ++
+                   max_field_size_max_provisos ++ final_bit_size_provisos
+        -- make sure all subfields can be turned into bits
+        fields_provisos_bits =
+            zipWith (\ field sv -> CPred (CTypeclass idCBOR) [cis_arg_type field, sv])
+                    tags field_bit_sizes
+        -- max_field_size_provisos constrain max_num_field_bits to an
+        --   upper bound of all subfield sizes by context:
+        --       add freshvar sizeof(field) max_num_field_bits
+        max_field_size_add_provisos
+             | num_tags <= 1 = []
+             | otherwise =
+               zipWith ( \ x sv ->
+                         CPred (CTypeclass idAdd)
+                                   [x, sv, max_num_field_bits])
+                       field_bit_size_paddings field_bit_sizes
+        -- max_field_size_max_provisos constrain max_num_field_bits to
+        --   the least upper bound of all subfield sizes by constraining
+        --   lastvar to be the largest
+        max_field_size_max_provisos
+             | null tags = []
+             | otherwise =
+                 let f _ [] _ = []
+                     f a (s:ss) (n:nn) =
+                         CPred (CTypeclass idMax) [s, a, n] : f n ss nn
+                     f _ _ _ = internalError "Deriving.doDBits.f: _ (_:_) []"
+                     b:bs = reverse field_bit_sizes
+                 in  f b bs max_field_size_sofar_vars
+        num_rep_bits_var:max_field_size_sofar_vars =
+            make_num_vars num_tags (everyThird tmpTyVarIds)
+        -- max_num_field_bits: # bits required to represent all fields w/o tags
+        max_num_field_bits = last max_field_size_sofar_vars
+        -- field_bit_sizes: the bit sizes of the fields (as CTypes)
+        field_bit_sizes = make_num_vars num_tags (everyThird (tail tmpTyVarIds))
+        -- field_bit_size_paddings: padding between individual field size
+        --   and the maximum field size; used only once, as dummy variables
+        field_bit_size_paddings = make_num_vars num_tags (everyThird (tail (tail tmpTyVarIds)))
+        -- final_bit_size_provisos constrain the final bit size of the
+        --   tagged union: tag size + max(field sizes) = final size
+        -- num_rep_bits_ctype: the final bit size of the tagged union
+        (final_bit_size_provisos, num_rep_bits_ctype) =
+                case original_tags of
+                []  -> ([], cTNum 0 decl_position)
+                [_] -> ([], headOrErr "doDCBOR" field_bit_sizes)
+                _   -> ([CPred (CTypeclass idAdd)
+                                   [num_tag_bits_ctype,
+                                    max_num_field_bits,
+                                    num_rep_bits_var]],
+                        num_rep_bits_var)
+        packed_ctype = TAp (cTCon idBit) num_rep_bits_ctype
+        pack_function =
+            CDef (idToCBORNQ dpos) (CQType [] (unpacked_ctype `fn` packed_ctype))
+                 pack_clauses
+        pack_clauses
+            | num_tags == 1 =
+                [CClause [CPCon1 type_name
+                          (getCISName (headOrErr "doDCBOR" tags)) (CPVar id_x)] []
+                 (cVApply idToCBOR [vx])]
+            | otherwise = zipWith mkPk tags field_bit_sizes
+        mkPk tag field_sz =
+            CClause [CPCon1 type_name (getCISName tag) (CPVar id_x)] []
+                        (cVApply idPrimConcat
+                         [litSz (cis_tag_encoding tag), pkBody field_sz])
+        pkBody sz = cVApply idPrimConcat [anyExprAt decl_position,
+                                          hasSz (cVApply idToCBOR [vx]) sz ]
+        litSz k = hasSz (CLit $ num_to_cliteral_at decl_position k)
+                  num_tag_bits_ctype
+
+        unpack_function = CDef (idFromCBORNQ dpos) unpack_type unpack_clauses
+        unpack_type = CQType [] (packed_ctype `fn` unpacked_ctype)
+        unpack_clauses
+            -- if there's only one, unpack the contents
+            | num_tags == 1 = [CClause [CPVar id_x] [] (CCon1 type_name (getCISName (headOrErr "doDCBOR" tags))
+                                                  (cVApply idFromCBOR [vx]))]
+             | otherwise = [CClause [CPVar id_x] []
+                            (monoDef id_y (cVApply idPrimSplit [vx]) $
+                             Ccase dpos
+                                   (hasSz (CSelectTT idPrimPair vy idPrimFst)
+                                    num_tag_bits_ctype)
+                                   (map mkUn tags))]
+        mkUn tag =
+            CCaseArm { cca_pattern = CPLit (num_to_cliteral_at decl_position
+                                            (cis_tag_encoding tag)),
+                       cca_filters = [],
+                       cca_consequent = (CCon1 type_name (getCISName tag)
+                                         unBody) }
+        unBody = cVApply idFromCBOR [cVApply idPrimTrunc
+                                   [CSelectTT idPrimPair vy idPrimSnd]]
+        vx = CVar id_x
+        vy = CVar id_y
+    in  Right $
+        [Cinstance (CQType provisos
+                    (cTApplys (cTCon idCBOR) [unpacked_ctype,
+                                              num_rep_bits_ctype]))
+         [CLValueSign pack_function [], CLValueSign unpack_function []]]
+
 
 
 -- -------------------------
@@ -891,6 +1141,10 @@ idPackNQ :: Position -> Id
 idPackNQ pos = setIdPosition pos (unQualId idPack)
 idUnpackNQ :: Position -> Id
 idUnpackNQ pos = setIdPosition pos (unQualId idUnpack)
+idToCBORNQ :: Position -> Id
+idToCBORNQ pos = setIdPosition pos (unQualId idToCBOR)
+idFromCBORNQ :: Position -> Id
+idFromCBORNQ pos = setIdPosition pos (unQualId idFromCBOR)
 idfshowNQ :: Position -> Id
 idfshowNQ pos = setIdPosition pos (unQualId idfshow)
 idMaxBoundNQ :: Position -> Id

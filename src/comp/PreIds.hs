@@ -80,12 +80,13 @@ idPrimSnd = prelude_id_no fsPrimSnd
 idPrimPair = prelude_id_no fsPrimPair
 idFalse = prelude_id_no fsFalse
 idTrue = prelude_id_no fsTrue
-idSizeOf, idTAdd, idTSub, idTMul, idTDiv, idTLog, idTExp, idTMax, idTMin :: Id
+idSizeOf, idTAdd, idTSub, idTMul, idTDiv, idTDivF, idTLog, idTExp, idTMax, idTMin :: Id
 idSizeOf = prelude_id_no fsSizeOf
 idTAdd = prelude_id_no fsTAdd
 idTSub = prelude_id_no fsTSub
 idTMul = prelude_id_no fsTMul
 idTDiv = prelude_id_no fsTDiv
+idTDivF = prelude_id_no fsTDivF
 idTLog = prelude_id_no fsTLog
 idTExp = prelude_id_no fsTExp
 idTMax = prelude_id_no fsTMax
@@ -155,9 +156,10 @@ idPreludePlus :: Id
 idPreludePlus = prelude_id_no fsPlus
 
 -- Used by deriving
-idEq, idBits, idLiteral, idRealLiteral, idSizedLiteral, idStringLiteral :: Id
+idEq, idBits, idCBOR, idLiteral, idRealLiteral, idSizedLiteral, idStringLiteral :: Id
 idEq = prelude_id_no fsEq
 idBits = prelude_id_no fsBits
+idCBOR = prelude_id_no fsCBOR
 idLiteral = prelude_id_no fsLiteral
 idRealLiteral = prelude_id_no fsRealLiteral
 idSizedLiteral = prelude_id_no fsSizedLiteral
@@ -170,13 +172,15 @@ idDefaultValue = prelude_id_no fsDefaultValue
 id_defaultValue = prelude_id_no fs_defaultValue
 idClsDeepSeqCond = prelude_id_no fsClsDeepSeqCond
 idPrimDeepSeqCond = prelude_id_no fsPrimDeepSeqCond
-idPrimSeqCond, idUndefined, idEqual, idNotEqual, idPack, idUnpack, idFmap :: Id
+idPrimSeqCond, idUndefined, idEqual, idNotEqual, idPack, idUnpack, idToCBOR, idFromCBOR, idFmap :: Id
 idPrimSeqCond = prelude_id_no fsPrimSeqCond
 idUndefined = prelude_id_no fsUndefined
 idEqual = prelude_id_no fsEqual
 idNotEqual = prelude_id_no fsNotEqual
 idPack = prelude_id_no fsPack
 idUnpack = prelude_id_no fsUnpack
+idToCBOR = prelude_id_no fsToCBOR
+idFromCBOR = prelude_id_no fsFromCBOR
 idFmap = prelude_id_no fsFmap
 idMaxBound, idMinBound, idBuildUndef, idMakeUndef, idRawUndef, idAdd :: Id
 idMaxBound = prelude_id_no fsMaxBound

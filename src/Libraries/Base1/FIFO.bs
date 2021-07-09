@@ -1,4 +1,4 @@
-package FIFO (FIFO(..), mkFIFO, mkFIFO1, mkSizedFIFO, mkLSizedFIFO, mkDepthParamFIFO, mkLFIFO, mkDepthParamLFIFO, fifofToFifo) where
+package FIFO (FIFO(..), mkFIFO, mkFIFO1, mkSizedFIFO, mkLSizedFIFO, mkDepthParamFIFO, mkLFIFO, mkDepthParamLFIFO, fifofToFifo, fifof_ToFifo) where
 
 import FIFOF_
 import FIFOF

@@ -1305,6 +1305,13 @@ bool operator!=(const WideData& v1, const WideData& v2)
   return !(v1 == v2);
 }
 
+bool operator!=(const WideData& v1, const unsigned int v2)
+{
+  WideData comp = WideData(v1.size(), v2);
+  return v1 != comp;
+}
+
+
 bool operator<(const WideData& v1, const WideData& v2)
 {
   unsigned int idx = v1.nWords;

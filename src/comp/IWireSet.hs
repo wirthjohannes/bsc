@@ -79,7 +79,8 @@ wsCheckResets (_, rs) = case l' of
                          [_]  -> True -- a single meaningful reset
                          _    -> False -- more than one real reset
   where l  = S.toList rs
-        l' = filter (not . isNoReset) l
+        l'' = filter (not . isNoReset) l
+        l' = filter (not . isFixedReset) l''
 
 wsToProps :: IWireSet a -> WireProps
 wsToProps ws = WireProps { wpClockDomain = wsGetClockDomain ws,

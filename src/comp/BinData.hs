@@ -939,10 +939,11 @@ instance Bin VClockInfo where
                    return (ClockInfo in_cs out_cs as ss)
 
 instance Bin VResetInfo where
-    writeBytes (ResetInfo in_rs out_rs) = do toBin in_rs; toBin out_rs
+    writeBytes (ResetInfo in_rs out_rs out_rs_f) = do toBin in_rs; toBin out_rs; toBin out_rs_f
     readBytes = do in_rs <- fromBin
                    out_rs <- fromBin
-                   return (ResetInfo in_rs out_rs)
+                   out_rs_f <- fromBin
+                   return (ResetInfo in_rs out_rs out_rs_f)
 
 instance Bin VArgInfo where
     writeBytes (Param a)    = do putI 0; toBin a

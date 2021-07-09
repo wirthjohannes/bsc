@@ -1216,6 +1216,8 @@ endfunction
 >            isInputReset _ = False
 >            isOutputReset (ISBVI _ (BVI_output_reset _)) = True
 >            isOutputReset _ = False
+>            isOutputResetFixedID (ISBVI _ (BVI_output_reset_fixedid _)) = True
+>            isOutputResetFixedID _ = False
 >            isMethod (ISBVI _ (BVI_method _)) = True
 >            isMethod _ = False
 >            isInterface (ISBVI _ (BVI_interface _)) = True
@@ -1372,6 +1374,8 @@ XXX checks for valid reset names could be done here rather than later
 >                  else (S.insert i rset, rposs)
 >              findRstNames (rset, rposs) (BVI_output_reset (i,_)) =
 >                  (S.insert i rset, rposs)
+>              findRstNames (rset, rposs) (BVI_output_reset_fixedid (i,_)) =
+>                  (S.insert i rset, rposs)
 >              findRstNames accum (BVI_interface (_,_,ss)) = foldl findRstNamesIS accum ss
 >              findRstNames accum _ = accum
 >              findRstNamesIS accum (ISBVI _ s) = findRstNames accum s
@@ -1468,6 +1472,10 @@ some of these restrictions could be lifted if we made the compiler more clever
 >                case (fst (snd inf)) of
 >                  Nothing -> ioerrs
 >                  Just rst -> addOutputPort pos rst ioerrs
+>            chkBVIPorts (ISBVI pos (BVI_output_reset_fixedid inf)) ioerrs =
+>                case (fst (snd inf)) of
+>                  Nothing -> ioerrs
+>                  Just rst -> addOutputPort pos rst ioerrs
 >            chkBVIPorts (ISBVI pos (BVI_arg (inf, _, _))) ioerrs =
 >                case inf of
 >                  Param name -> addInput pos name ioerrs
@@ -1509,11 +1517,14 @@ Extract each type of statement, making sure to preserve the order
 >            (out_resets, bvis7) =
 >               apFst (map (\ (ISBVI _ (BVI_output_reset a)) -> a)) $
 >                   partition isOutputReset bvis6
+>            (out_resets_fixedid, bvis72) =
+>               apFst (map (\ (ISBVI _ (BVI_output_reset_fixedid a)) -> a)) $
+>                   partition isOutputResetFixedID bvis7
 >            (args, bvis8) =
 >               -- parameters in particular need to remain in order,
 >               -- because instantiaion in v95 syntax uses positional args
 >               apFst (map (\ (ISBVI _ (BVI_arg a)) -> a)) $
->                   partition isArg bvis7
+>                   partition isArg bvis72
 >            (methods, bvis9) =
 >               apFst (map (\ (ISBVI _ (BVI_method a)) -> a)) $
 >                   partition isMethod bvis8
@@ -1546,6 +1557,7 @@ Extract each type of statement, making sure to preserve the order
 >                case stmt of
 >                   (BVI_output_clock c) -> (c:cs, rs,   ms)
 >                   (BVI_output_reset r) -> (cs,   r:rs, ms)
+>                   (BVI_output_reset_fixedid r) -> (cs, r:rs, ms)
 >                   (BVI_method m)       -> (cs,   rs,   m:ms)
 >                   (BVI_interface (_,_,ss)) -> foldr sepFn e0 ss
 >                   _ -> internalError "convImperativeStmtsToCStmts:ISBVI(6a)"
@@ -1600,6 +1612,7 @@ Extract each type of statement, making sure to preserve the order
 >        -- resets and nested resets
 >        -- (this also checks that the associated clock names are valid)
 >        alloutresets <- mapM defaultResetInfClk (nrs ++ out_resets)
+>        alloutresetsfixedid <- mapM defaultResetInfClk out_resets_fixedid
 >        allinresets <- mapM defaultResetInfClk in_resets
 >        let allresetids = map fst alloutresets ++ map fst allinresets
 >            alluserresetids = allresetids \\ unnamed_rsts
@@ -1923,7 +1936,7 @@ Extract each type of statement, making sure to preserve the order
 >                    fname
 >                    True -- is a user import
 >                    (ClockInfo allinclocks alloutclocks ancestors familys)
->                    (ResetInfo allinresets alloutresets)
+>                    (ResetInfo allinresets alloutresets alloutresetsfixedid)
 >                    updated_args
 >                    methods'
 >                    vsi

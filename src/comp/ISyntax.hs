@@ -69,6 +69,7 @@ module ISyntax(
         getResetClock,
         getResetId,
         isNoReset,
+        isFixedReset,
         isMissingDefaultReset,
         makeInout,
         getInoutWire,
@@ -91,7 +92,7 @@ import IntLit
 import Undefined
 import Eval
 import Id
-import Wires(ResetId, ClockDomain, ClockId, noClockId, noResetId, noDefaultClockId, noDefaultResetId, WireProps)
+import Wires(ResetId, ClockDomain, ClockId, noClockId, noResetId, fixedResetId, noDefaultClockId, noDefaultResetId, WireProps)
 import IdPrint
 import PreIds(idSizeOf, idId, idBind, idReturn, idPack, idUnpack, idMonad, idLiftModule, idBit, idFromInteger)
 import Backend
@@ -664,6 +665,10 @@ getResetId = ir_id
 -- noReset defined in ISyntaxUtil (like noClock)
 isNoReset :: IReset a -> Bool
 isNoReset IReset { ir_id = i } = i == noResetId
+
+-- noReset defined in ISyntaxUtil (like noClock)
+isFixedReset :: IReset a -> Bool
+isFixedReset IReset { ir_id = i } = i == fixedResetId
 
 isMissingDefaultReset :: IReset a -> Bool
 isMissingDefaultReset (IReset { ir_id = i }) = i == noDefaultResetId
